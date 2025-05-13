@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strings"
@@ -21,10 +22,12 @@ const (
 	forkChance            = 0.15
 	forkHorizontalSpread  = 3
 	segmentLifespan       = 800 * time.Millisecond
+	windAngleIncrement    = 5  // Wind angle change per key press
+	maxWindAngle          = 30 // Maximum wind angle in either direction
 )
 
 var (
-	rainChars      = []rune{'|', '.', '`'}
+	rainChars      = []rune{'|', '.', '`'} // Default rain characters
 	lightningChars = []rune{'*', '+', '#'}
 )
 
@@ -41,10 +44,11 @@ var lipglossColorMap = map[string]lipgloss.TerminalColor{
 
 // Raindrop represents a single raindrop.
 type Raindrop struct {
-	x     int
-	y     float64
-	speed float64
-	char  rune
+	x       int
+	y       float64
+	speed   float64
+	char    rune
+	xOffset float64 // For tracking wind-caused horizontal movement
 }
 
 // LightningSegment represents a segment of a lightning bolt.
@@ -188,6 +192,28 @@ func (lb *LightningBolt) grow(currentTime time.Time) {
 	}
 }
 
+// getWindAdjustedChar transforms a rain character based on wind angle
+func getWindAdjustedChar(char rune, windAngle int) rune {
+	// No transformation for no wind or non-vertical characters
+	if windAngle == 0 || char != '|' {
+		return char
+	}
+
+	// Transform character based on wind direction
+	if windAngle < 0 {
+		return '/' // Left-leaning rain
+	}
+	return '\\' // Right-leaning rain
+}
+
+// abs returns the absolute value of an integer
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
 // UpdateBolt updates the state of the lightning bolt.
 // It returns false if the bolt is no longer active (all segments expired and not growing).
 // This method now uses a pointer receiver to modify the LightningBolt instance.
@@ -229,10 +255,12 @@ type model struct {
 	isThunderstorm bool
 	rainStyle      lipgloss.Style
 	lightningStyle lipgloss.Style
+	statusStyle    lipgloss.Style
 	rng            *rand.Rand
 	quitting       bool
 	screenBuffer   [][]CellData
 	defaultCell    CellData
+	windAngle      int // Current wind angle (-maxWindAngle to +maxWindAngle)
 }
 
 // CellData stores character and style for a single cell on the screen.
@@ -258,6 +286,7 @@ func initialModel(rainColorName, lightningColorName string) model {
 	return model{
 		rainStyle:      lipgloss.NewStyle().Foreground(rc),
 		lightningStyle: lipgloss.NewStyle().Foreground(lc).Bold(true),
+		statusStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("3")), // Yellow color for status
 		rng:            r,
 		defaultCell:    CellData{char: ' ', style: lipgloss.NewStyle()},
 	}
@@ -343,16 +372,49 @@ func (m model) updateRaindropSystem() model {
 				x = m.rng.Intn(m.width)
 			}
 			speed := m.rng.Float64()*(maxSpeed-minSpeed) + minSpeed
-			char := rainChars[m.rng.Intn(len(rainChars))]
-			m.raindrops = append(m.raindrops, &Raindrop{x: x, y: 0.0, speed: speed, char: char})
+			// Select basic rain character
+			charIndex := m.rng.Intn(len(rainChars))
+			char := rainChars[charIndex]
+			// Adjust character based on wind
+			char = getWindAdjustedChar(char, m.windAngle)
+			m.raindrops = append(m.raindrops, &Raindrop{
+				x:       x,
+				y:       0.0,
+				speed:   speed,
+				char:    char,
+				xOffset: 0.0,
+			})
 		}
+	}
+
+	// Calculate wind offset based on angle
+	windOffsetPerUnit := 0.0
+	if m.windAngle != 0 {
+		// Convert to radians and calculate a smooth factor
+		angleRad := float64(m.windAngle) * (math.Pi / 180.0)
+
+		// Use sine function for smoother movement at high angles
+		windOffsetPerUnit = math.Sin(angleRad) * 0.3
 	}
 
 	// Update existing raindrops
 	var nextRaindrops []*Raindrop
 	for _, drop := range m.raindrops {
 		drop.y += drop.speed
-		if int(drop.y) < m.height {
+
+		// Apply wind effect proportional to drop speed
+		// This creates more natural-looking movement where faster drops are affected more by wind
+		drop.xOffset += drop.speed * windOffsetPerUnit
+
+		// Update character based on current wind direction
+		// Only change the character if it's a vertical line
+		if drop.char == '|' || drop.char == '/' || drop.char == '\\' {
+			drop.char = getWindAdjustedChar('|', m.windAngle)
+		}
+
+		// Check if the drop is still on screen
+		adjustedX := int(float64(drop.x) + drop.xOffset)
+		if int(drop.y) < m.height && adjustedX >= 0 && adjustedX < m.width {
 			nextRaindrops = append(nextRaindrops, drop)
 		}
 	}
@@ -378,6 +440,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.raindrops = nil
 			m.activeBolts = nil
 			return m, nil // No command needed, just state change
+		case "left":
+			// Increase wind angle to the left (negative)
+			if m.windAngle > -maxWindAngle {
+				m.windAngle -= windAngleIncrement
+			}
+			return m, nil
+		case "right":
+			// Increase wind angle to the right (positive)
+			if m.windAngle < maxWindAngle {
+				m.windAngle += windAngleIncrement
+			}
+			return m, nil
 		}
 
 	case tea.WindowSizeMsg:
@@ -433,7 +507,7 @@ func (m model) View() string {
 	}
 	for _, drop := range m.raindrops {
 		yPos := int(drop.y)
-		xPos := drop.x
+		xPos := int(float64(drop.x) + drop.xOffset)
 		if yPos >= 0 && yPos < m.height && xPos >= 0 && xPos < m.width {
 			m.screenBuffer[yPos][xPos] = CellData{char: drop.char, style: currentRainStyle}
 		}
@@ -479,6 +553,36 @@ func (m model) View() string {
 			b.WriteRune('\n')
 		}
 	}
+
+	// Add status information at the bottom
+	// Create wind status text
+	var windDesc string
+	absAngle := abs(m.windAngle)
+
+	if absAngle == 0 {
+		windDesc = "calm"
+	} else if absAngle <= 10 {
+		windDesc = "light"
+	} else if absAngle <= 20 {
+		windDesc = "moderate"
+	} else {
+		windDesc = "strong"
+	}
+
+	// Add direction indicator
+	var dirIndicator string
+	if m.windAngle < 0 {
+		dirIndicator = "<-"
+	} else if m.windAngle > 0 {
+		dirIndicator = "->"
+	}
+
+	statusText := fmt.Sprintf("\nWind: %+d° (%s %s)", m.windAngle, windDesc, dirIndicator)
+	if m.isThunderstorm {
+		statusText += " | Thunderstorm active"
+	}
+	b.WriteString(m.statusStyle.Render(statusText))
+
 	return b.String()
 }
 
@@ -507,7 +611,7 @@ func main() {
 	// Initial messages to the user
 	fmt.Println("Initializing Terminal Weather Simulation (Rain/Lightning)...")
 	fmt.Printf("Configuration loaded: Rain color=%s, Lightning color=%s\n", *rainColorArg, *lightningColorArg)
-	fmt.Println("Controls: 't' - Toggle thunderstorm mode, 'q'|ESC|Ctrl+C - Exit program.")
+	fmt.Println("Controls: 't' - Toggle thunderstorm mode, '←/→' - Adjust wind direction (max ±30°), 'q'|ESC|Ctrl+C - Exit program.")
 	time.Sleep(1 * time.Second)
 
 	if _, err := p.Run(); err != nil {
