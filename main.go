@@ -44,11 +44,12 @@ var lipglossColorMap = map[string]lipgloss.TerminalColor{
 
 // Raindrop represents a single raindrop.
 type Raindrop struct {
-	x       int
-	y       float64
-	speed   float64
-	char    rune
-	xOffset float64 // For tracking wind-caused horizontal movement
+	x            int
+	y            float64
+	speed        float64
+	acceleration float64 // Gravity acceleration
+	char         rune
+	xOffset      float64 // For tracking wind-caused horizontal movement
 }
 
 // LightningSegment represents a segment of a lightning bolt.
@@ -345,13 +346,16 @@ func (m model) updateLightningSystem() model {
 func (m model) updateRaindropSystem() model {
 	generationChance := 0.3
 	maxNewDrops := m.width / 15
-	minSpeed := 0.1
-	maxSpeed := 0.6
+	minSpeed := 0.05
+	maxSpeed := 0.4
+	minAcceleration := 0.003
+	maxAcceleration := 0.015
 
 	if m.isThunderstorm {
 		generationChance = 0.5
 		maxNewDrops = m.width / 8
-		maxSpeed = 1.0
+		maxSpeed = 0.6
+		maxAcceleration = 0.025
 	}
 	if maxNewDrops < 1 {
 		maxNewDrops = 1
@@ -371,18 +375,21 @@ func (m model) updateRaindropSystem() model {
 			if m.width > 0 {
 				x = m.rng.Intn(m.width)
 			}
+			// Randomize initial speed and acceleration
 			speed := m.rng.Float64()*(maxSpeed-minSpeed) + minSpeed
+			acceleration := m.rng.Float64()*(maxAcceleration-minAcceleration) + minAcceleration
 			// Select basic rain character
 			charIndex := m.rng.Intn(len(rainChars))
 			char := rainChars[charIndex]
 			// Adjust character based on wind
 			char = getWindAdjustedChar(char, m.windAngle)
 			m.raindrops = append(m.raindrops, &Raindrop{
-				x:       x,
-				y:       0.0,
-				speed:   speed,
-				char:    char,
-				xOffset: 0.0,
+				x:            x,
+				y:            0.0,
+				speed:        speed,
+				acceleration: acceleration,
+				char:         char,
+				xOffset:      0.0,
 			})
 		}
 	}
@@ -400,6 +407,10 @@ func (m model) updateRaindropSystem() model {
 	// Update existing raindrops
 	var nextRaindrops []*Raindrop
 	for _, drop := range m.raindrops {
+		// Apply acceleration to speed (gravity effect)
+		drop.speed += drop.acceleration
+
+		// Update position with current speed
 		drop.y += drop.speed
 
 		// Apply wind effect proportional to drop speed
