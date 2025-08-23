@@ -1,64 +1,38 @@
-# Tamama
+# Tamama - Terminal Boids Simulation
 
-A terminal-based weather animation system that simulates rain and lightning in your console.
+A real-time flocking simulation using the Boids algorithm, rendered in your terminal.
 
 ## Features
 
-- Realistic rain animation with variable intensity
-- Dynamic lightning effects during thunderstorms
-- Wind effects that change the direction of rainfall
-- Customizable colors for both rain and lightning
-- Interactive controls to adjust the weather simulation
+- **Dynamic Boid Count**: Automatically adjusts flock size based on terminal dimensions
+- **Sine Wave Leadership**: Invisible leader guides the flock in smooth wave patterns
+- **Adaptive Boundaries**: Boids bounce off terminal edges naturally
+- **Live Controls**: Pause, reset, and adjust frame rate on the fly
+
+## Controls
+
+- `Space` - Pause/Resume simulation
+- `F` - Toggle between 30/60 FPS
+- `R` - Reset simulation
+- `Q` - Quit
 
 ## Installation
 
-```
-go install github.com/omegaatt36/tamama@latest
-```
-
-Or clone the repository and build from source:
-
-```
-git clone https://github.com/omegaatt36/tamama.git
-cd tamama
-go build
+```bash
+cargo install --path .
 ```
 
 ## Usage
 
-Run the program with default settings:
-
+```bash
+cargo run --release
 ```
-tamama
-```
-
-### Command-line Options
-
-- `--rain-color`: Set the color for rain (black, red, green, yellow, blue, magenta, cyan, white)
-- `--lightning-color`: Set the color for lightning (black, red, green, yellow, blue, magenta, cyan, white)
-
-Example:
-
-```
-tamama --rain-color blue --lightning-color yellow
-```
-
-### Interactive Controls
-
-- `t`: Toggle thunderstorm mode
-- `←/→`: Adjust wind direction (max ±30°)
-- `q`, `ESC`, `Ctrl+C`: Exit the program
 
 ## Requirements
 
-- Go 1.24.0 or higher
-- Terminal with ANSI color support
+- Rust 1.70+
+- Terminal with Unicode support
 
-## Dependencies
+---
 
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea): Terminal UI framework
-- [Lipgloss](https://github.com/charmbracelet/lipgloss): Style definitions for terminal applications
-
-## License
-
-This project is open source and available under the [MIT License](LICENSE).
+Built with Rust 🦀 | Powered by [ratatui](https://github.com/ratatui-org/ratatui)
