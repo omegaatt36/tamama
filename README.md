@@ -9,24 +9,38 @@ A real-time flocking simulation using the Boids algorithm, rendered in your term
 - **Adaptive Boundaries**: Boids bounce off terminal edges naturally
 - **Live Controls**: Pause, reset, and adjust frame rate on the fly
 
-## Controls
-
-- `Space` - Pause/Resume simulation
-- `F` - Toggle between 30/60 FPS
-- `R` - Reset simulation
-- `Q` - Quit
-
 ## Installation
 
+### From crates.io (Recommended)
+
 ```bash
+cargo install tamama
+```
+
+### From GitHub Releases
+
+Download the latest binary for your platform from the [releases page](https://github.com/yourusername/tamama/releases).
+
+### From Source
+
+```bash
+git clone https://github.com/yourusername/tamama.git
+cd tamama
 cargo install --path .
 ```
 
 ## Usage
 
 ```bash
-cargo run --release
+tamama
 ```
+
+## Controls
+
+- `Space` - Pause/Resume simulation
+- `F` - Toggle between 30/60 FPS
+- `R` - Reset simulation
+- `Q` - Quit
 
 ## Requirements
 

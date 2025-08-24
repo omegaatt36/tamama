@@ -2,6 +2,13 @@
 name = "tamama"
 version = "0.1.0"
 edition = "2021"
+description = "A real-time flocking simulation using the Boids algorithm, rendered in your terminal"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/tamama"
+homepage = "https://github.com/yourusername/tamama"
+keywords = ["boids", "simulation", "terminal", "tui", "flocking"]
+categories = ["games", "simulation", "command-line-utilities"]
+readme = "README.md"
 
 [dependencies]
 ratatui = "0.26"
